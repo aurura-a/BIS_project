@@ -1,18 +1,53 @@
-# Gym Booking Backend (stub)
+# Gym Booking Backend
 
-Заготовка бэкенда проекта. Стек: Spring Boot 4, Java 21, Maven, Angular.
+Бэкенд проекта. Стек: Spring Boot 4, Java 21, Maven, Angular.
 
 Структура:
 
-- `controller` — эндпоинты, возвращают готовый текст
+- `controller` — эндпоинты
 - `dto` — тела запросов из контракта с аннотациями валидации, enum'ы для query-параметров
 - `error` — ошибки и их вывод текстом
+- `repository` — SQL-доступ к PostgreSQL
+- `service` — сохранение пользователей, абонементов, занятий и бронирований
+- `src/main/resources/schema.sql` — SQL для создания таблиц
 
 
 адрес локального апи: http://localhost:8080/api/v1/
 
 контракт апи лежит в ресурсах проекта по адресу src/main/resources/static
 заготовка по фронтэнду пока не функционирует, но находится в процессе написания
+
+## PostgreSQL
+
+Создайте базу данных один раз:
+
+```sql
+CREATE DATABASE gym_db;
+```
+
+При запуске Spring Boot файл `schema.sql` автоматически создаст таблицы, если их
+ещё нет. Для локального PostgreSQL по умолчанию используется `localhost:5432`, пользователь
+`postgres` и пустой пароль. Если у вас другие параметры, перед запуском задайте:
+
+```sh
+export DB_URL=jdbc:postgresql://localhost:5432/gym_db
+export DB_USERNAME=postgres
+export DB_PASSWORD=your-local-postgres-password
+export JWT_SECRET="$(openssl rand -base64 32)"
+mvn spring-boot:run
+```
+
+`JWT_SECRET` обязателен: это Base64-ключ длиной не менее 32 байт для подписи
+Bearer-токенов. Регистрация создает пользователя с ролью `CLIENT`; первую учетную
+запись администратора можно назначить вручную в PostgreSQL, например:
+
+```sql
+UPDATE users SET role = 'ADMIN' WHERE email = 'admin@example.com';
+```
+
+Бронирование выполняется в транзакции: класс блокируется на время проверки мест,
+после чего создаются бронирование и списание посещения, а счетчик мест уменьшается.
+Ошибка любого шага отменяет все изменения.
 
 ## API
 

@@ -6,6 +6,9 @@ import jakarta.validation.constraints.Min;
 import kz.gymbooking.dto.Role;
 import kz.gymbooking.dto.RoleChangeRequest;
 import kz.gymbooking.dto.UserUpdate;
+import kz.gymbooking.service.UserService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,21 +21,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(value = "/users", produces = "text/plain;charset=UTF-8")
 public class UserController {
 
+    private final UserService userService;
+
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
+
     @GetMapping("/me")
-    public String me() {
-        return """
-                id: 17
-                email: aruzhan@example.com
-                fullName: Aruzhan Bekova
-                phone: +77011234567
-                role: CLIENT
-                createdAt: 2026-10-11T09:00:00Z
-                """;
+    public String me(@AuthenticationPrincipal Jwt jwt) {
+        return userService.getCurrentUser(Long.parseLong(jwt.getSubject()));
     }
 
     @PatchMapping("/me")
-    public String updateMe(@Valid @RequestBody UserUpdate req) {
-        return "id: 17\nfullName: " + req.fullName() + "\nphone: " + req.phone() + "\nrole: CLIENT\n";
+    public String updateMe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UserUpdate request) {
+        return userService.updateCurrentUser(Long.parseLong(jwt.getSubject()), request);
     }
 
     @GetMapping
@@ -40,17 +42,11 @@ public class UserController {
                        @RequestParam(required = false) String q,
                        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
                        @RequestParam(defaultValue = "0") @Min(0) int offset) {
-        return """
-                total: 4
-                #1 Admin, admin@example.com, ADMIN
-                #3 Dana Serikova, dana.trainer@example.com, TRAINER
-                #5 Reception Desk, reception@example.com, STAFF
-                #17 Aruzhan Bekova, aruzhan@example.com, CLIENT
-                """;
+        return userService.listUsers(role, q, limit, offset);
     }
 
     @PatchMapping("/{userId}/role")
     public String changeRole(@PathVariable int userId, @Valid @RequestBody RoleChangeRequest req) {
-        return "id: " + userId + "\nrole: " + req.role() + "\n";
+        return userService.changeRole(userId, req.role());
     }
 }
