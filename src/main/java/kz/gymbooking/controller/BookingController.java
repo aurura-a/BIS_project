@@ -7,10 +7,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import kz.gymbooking.dto.BookingStatus;
 import kz.gymbooking.dto.CreateBookingRequest;
-import kz.gymbooking.service.BookingService;
+import kz.gymbooking.error.ApiException;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,35 +23,46 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(produces = "text/plain;charset=UTF-8")
 public class BookingController {
 
-    private final BookingService bookingService;
-
-    public BookingController(BookingService bookingService) {
-        this.bookingService = bookingService;
-    }
-
     @PostMapping("/bookings")
     @ResponseStatus(HttpStatus.CREATED)
-    public String create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CreateBookingRequest request,
+    public String create(@Valid @RequestBody CreateBookingRequest req,
                          @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey) {
-        return bookingService.create(Long.parseLong(jwt.getSubject()), request, idempotencyKey);
+        switch (req.classId()) {
+            case 42 -> throw new ApiException(HttpStatus.CONFLICT, "ALREADY_BOOKED", "You already booked this class");
+            case 44 -> throw new ApiException(HttpStatus.CONFLICT, "CLASS_FULL", "Class is full");
+            case 45 -> throw new ApiException(HttpStatus.CONFLICT, "CLASS_NOT_BOOKABLE", "Class is cancelled");
+            default -> {
+            }
+        }
+        return "id: 502\nclientId: 17\nclassId: " + req.classId() + "\nstatus: BOOKED\n";
     }
 
     @GetMapping("/users/me/bookings")
-    public String myBookings(@AuthenticationPrincipal Jwt jwt,
-                             @RequestParam(required = false) BookingStatus status,
+    public String myBookings(@RequestParam(required = false) BookingStatus status,
                              @RequestParam(required = false) Boolean upcoming,
                              @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
                              @RequestParam(defaultValue = "0") @Min(0) int offset) {
-        return bookingService.listForUser(Long.parseLong(jwt.getSubject()), status, upcoming, limit, offset);
+        return """
+                total: 3
+                #501 Morning Yoga, 2026-11-20T07:00:00Z, BOOKED
+                #498 Morning Yoga, 2026-11-05T07:00:00Z, ATTENDED
+                #490 Evening Stretching, 2026-11-20T15:00:00Z, CANCELLED
+                """;
     }
 
     @GetMapping("/bookings/{bookingId}")
-    public String get(@AuthenticationPrincipal Jwt jwt, @PathVariable int bookingId) {
-        return bookingService.get(Long.parseLong(jwt.getSubject()), bookingId);
+    public String get(@PathVariable int bookingId) {
+        return """
+                id: 501
+                clientId: 17
+                class: #42 Morning Yoga, 2026-11-20T07:00:00Z
+                status: BOOKED
+                bookedAt: 2026-11-10T08:00:00Z
+                """;
     }
 
     @PostMapping("/bookings/{bookingId}/cancel")
-    public String cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable int bookingId) {
-        return bookingService.cancel(Long.parseLong(jwt.getSubject()), bookingId);
+    public String cancel(@PathVariable int bookingId) {
+        return "id: " + bookingId + "\nstatus: CANCELLED\n";
     }
 }

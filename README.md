@@ -8,7 +8,6 @@
 - `dto` — тела запросов из контракта с аннотациями валидации, enum'ы для query-параметров
 - `error` — ошибки и их вывод текстом
 - `repository` — SQL-доступ к PostgreSQL
-- `service` — сохранение пользователей, абонементов, занятий и бронирований
 - `src/main/resources/schema.sql` — SQL для создания таблиц
 
 
@@ -26,28 +25,17 @@ CREATE DATABASE gym_db;
 ```
 
 При запуске Spring Boot файл `schema.sql` автоматически создаст таблицы, если их
-ещё нет. Для локального PostgreSQL по умолчанию используется `localhost:5432`, пользователь
-`postgres` и пустой пароль. Если у вас другие параметры, перед запуском задайте:
+ещё нет. Для подключения задайте параметры вашей локальной PostgreSQL:
 
 ```sh
 export DB_URL=jdbc:postgresql://localhost:5432/gym_db
-export DB_USERNAME=postgres
-export DB_PASSWORD=your-local-postgres-password
-export JWT_SECRET="$(openssl rand -base64 32)"
+export DB_USERNAME="$(whoami)"
+export DB_PASSWORD=
 mvn spring-boot:run
 ```
 
-`JWT_SECRET` обязателен: это Base64-ключ длиной не менее 32 байт для подписи
-Bearer-токенов. Регистрация создает пользователя с ролью `CLIENT`; первую учетную
-запись администратора можно назначить вручную в PostgreSQL, например:
-
-```sql
-UPDATE users SET role = 'ADMIN' WHERE email = 'admin@example.com';
-```
-
-Бронирование выполняется в транзакции: класс блокируется на время проверки мест,
-после чего создаются бронирование и списание посещения, а счетчик мест уменьшается.
-Ошибка любого шага отменяет все изменения.
+Для другой установки PostgreSQL укажите имя пользователя и пароль, заданные при
+настройке сервера.
 
 ## API
 
