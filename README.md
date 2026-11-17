@@ -1,18 +1,41 @@
-# Gym Booking Backend (stub)
+# Gym Booking Backend
 
-Заготовка бэкенда проекта. Стек: Spring Boot 4, Java 21, Maven, Angular.
+Бэкенд проекта. Стек: Spring Boot 4, Java 21, Maven, Angular.
 
 Структура:
 
-- `controller` — эндпоинты, возвращают готовый текст
+- `controller` — эндпоинты
 - `dto` — тела запросов из контракта с аннотациями валидации, enum'ы для query-параметров
 - `error` — ошибки и их вывод текстом
+- `repository` — SQL-доступ к PostgreSQL
+- `src/main/resources/schema.sql` — SQL для создания таблиц
 
 
 адрес локального апи: http://localhost:8080/api/v1/
 
 контракт апи лежит в ресурсах проекта по адресу src/main/resources/static
 заготовка по фронтэнду пока не функционирует, но находится в процессе написания
+
+## PostgreSQL
+
+Создайте базу данных один раз:
+
+```sql
+CREATE DATABASE gym_db;
+```
+
+При запуске Spring Boot файл `schema.sql` автоматически создаст таблицы, если их
+ещё нет. Для подключения задайте параметры вашей локальной PostgreSQL:
+
+```sh
+export DB_URL=jdbc:postgresql://localhost:5432/gym_db
+export DB_USERNAME="$(whoami)"
+export DB_PASSWORD=
+mvn spring-boot:run
+```
+
+Для другой установки PostgreSQL укажите имя пользователя и пароль, заданные при
+настройке сервера.
 
 ## API
 
