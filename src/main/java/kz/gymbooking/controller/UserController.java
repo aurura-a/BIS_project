@@ -6,6 +6,9 @@ import jakarta.validation.constraints.Min;
 import kz.gymbooking.dto.Role;
 import kz.gymbooking.dto.RoleChangeRequest;
 import kz.gymbooking.dto.UserUpdate;
+import kz.gymbooking.error.ApiException;
+import kz.gymbooking.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,21 +21,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(value = "/users", produces = "text/plain;charset=UTF-8")
 public class UserController {
 
+    private final UserRepository users;
+
+    public UserController(UserRepository users) {
+        this.users = users;
+    }
+
     @GetMapping("/me")
     public String me() {
-        return """
-                id: 17
-                email: aruzhan@example.com
-                fullName: Aruzhan Bekova
-                phone: +77011234567
-                role: CLIENT
-                createdAt: 2026-10-11T09:00:00Z
-                """;
+        var user = users.findById(17).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "User not found"));
+        return "id: " + user.id() + "\nemail: " + user.email() + "\nfullName: " + user.fullName()
+                + "\nphone: " + (user.phone() == null ? "" : user.phone()) + "\nrole: " + user.role()
+                + "\ncreatedAt: " + user.createdAt() + "\n";
     }
 
     @PatchMapping("/me")
     public String updateMe(@Valid @RequestBody UserUpdate req) {
-        return "id: 17\nfullName: " + req.fullName() + "\nphone: " + req.phone() + "\nrole: CLIENT\n";
+        if (!users.updateProfile(17, req.fullName(), req.phone())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "User not found");
+        }
+        var user = users.findById(17).orElseThrow();
+        return "id: " + user.id() + "\nfullName: " + user.fullName() + "\nphone: "
+                + (user.phone() == null ? "" : user.phone()) + "\nrole: " + user.role() + "\n";
     }
 
     @GetMapping
@@ -40,17 +51,18 @@ public class UserController {
                        @RequestParam(required = false) String q,
                        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
                        @RequestParam(defaultValue = "0") @Min(0) int offset) {
-        return """
-                total: 4
-                #1 Admin, admin@example.com, ADMIN
-                #3 Dana Serikova, dana.trainer@example.com, TRAINER
-                #5 Reception Desk, reception@example.com, STAFF
-                #17 Aruzhan Bekova, aruzhan@example.com, CLIENT
-                """;
+        var found = users.findAll(role == null ? null : role.name(), q, limit, offset);
+        StringBuilder body = new StringBuilder("total: ").append(found.size()).append('\n');
+        found.forEach(user -> body.append('#').append(user.id()).append(' ').append(user.fullName())
+                .append(", ").append(user.email()).append(", ").append(user.role()).append('\n'));
+        return body.toString();
     }
 
     @PatchMapping("/{userId}/role")
     public String changeRole(@PathVariable int userId, @Valid @RequestBody RoleChangeRequest req) {
+        if (!users.updateRole(userId, req.role().name())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "User not found");
+        }
         return "id: " + userId + "\nrole: " + req.role() + "\n";
     }
 }

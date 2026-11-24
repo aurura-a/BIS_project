@@ -1,8 +1,11 @@
 package kz.gymbooking.controller;
 
+import java.time.LocalDate;
+
 import jakarta.validation.Valid;
 import kz.gymbooking.dto.BuyMembershipRequest;
 import kz.gymbooking.error.ApiException;
+import kz.gymbooking.repository.MembershipRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping(produces = "text/plain;charset=UTF-8")
 public class MembershipController {
+
+    private static final long CURRENT_USER_ID = 17;
+    private final MembershipRepository memberships;
+
+    public MembershipController(MembershipRepository memberships) {
+        this.memberships = memberships;
+    }
 
     @GetMapping("/membership-plans")
     public String plans() {
@@ -27,17 +37,34 @@ public class MembershipController {
     @PostMapping("/memberships")
     @ResponseStatus(HttpStatus.CREATED)
     public String buy(@Valid @RequestBody BuyMembershipRequest req) {
-        if (req.startDate() == null) {
+        LocalDate start = req.startDate() == null ? LocalDate.now() : req.startDate();
+        String planName;
+        Integer visitLimit;
+        Integer visitsRemaining;
+        int price;
+        int duration;
+        switch (req.planId()) {
+            case 1 -> { planName = "Monthly Unlimited"; duration = 30; visitLimit = null; price = 25000; }
+            case 2 -> { planName = "12 Visits"; duration = 60; visitLimit = 12; price = 18000; }
+            case 3 -> { planName = "Annual Unlimited"; duration = 365; visitLimit = null; price = 220000; }
+            default -> throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Membership plan not found");
+        }
+        visitsRemaining = visitLimit;
+        LocalDate end = start.plusDays(duration);
+        if (memberships.hasActiveOverlap(CURRENT_USER_ID, start, end)) {
             throw new ApiException(HttpStatus.CONFLICT, "MEMBERSHIP_OVERLAP", "You already have an active membership");
         }
-        return "id: 901\nplanId: " + req.planId() + "\nstartDate: " + req.startDate() + "\nstatus: ACTIVE\n";
+        long id = memberships.create(CURRENT_USER_ID, planName, start, end, visitLimit, visitsRemaining, price);
+        return "id: " + id + "\nplanId: " + req.planId() + "\nstartDate: " + start + "\nstatus: ACTIVE\n";
     }
 
     @GetMapping("/users/me/memberships")
     public String myMemberships() {
-        return """
-                #900 Monthly Unlimited, 2026-10-31 - 2026-11-30, ACTIVE
-                #850 12 Visits, 2026-08-22 - 2026-10-21, EXPIRED
-                """;
+        var found = memberships.findByUserId(CURRENT_USER_ID);
+        StringBuilder body = new StringBuilder();
+        found.forEach(membership -> body.append('#').append(membership.id()).append(' ').append(membership.planName())
+                .append(", ").append(membership.startsOn()).append(" - ").append(membership.endsOn())
+                .append(", ").append(membership.status()).append('\n'));
+        return body.toString();
     }
 }

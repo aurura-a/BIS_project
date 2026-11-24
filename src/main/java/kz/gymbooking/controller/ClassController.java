@@ -9,6 +9,8 @@ import kz.gymbooking.dto.CancelClassRequest;
 import kz.gymbooking.dto.GymClassCreate;
 import kz.gymbooking.dto.GymClassUpdate;
 import kz.gymbooking.error.ApiException;
+import kz.gymbooking.repository.BookingRepository;
+import kz.gymbooking.repository.ClassRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -24,6 +26,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(value = "/classes", produces = "text/plain;charset=UTF-8")
 public class ClassController {
 
+    private final ClassRepository classes;
+    private final BookingRepository bookings;
+
+    public ClassController(ClassRepository classes, BookingRepository bookings) {
+        this.classes = classes;
+        this.bookings = bookings;
+    }
+
     @GetMapping
     public String list(@RequestParam(required = false) OffsetDateTime from,
                        @RequestParam(required = false) OffsetDateTime to,
@@ -32,56 +42,69 @@ public class ClassController {
                        @RequestParam(defaultValue = "false") boolean onlyAvailable,
                        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
                        @RequestParam(defaultValue = "0") @Min(0) int offset) {
-        return """
-                total: 4
-                #42 Morning Yoga, 2026-11-20T07:00:00Z, Hall A, trainer #3, 12/15, SCHEDULED
-                #43 CrossFit Basics, 2026-11-20T13:00:00Z, Hall B, trainer #4, 8/20, SCHEDULED
-                #44 Evening Stretching, 2026-11-20T15:00:00Z, Hall A, trainer #3, 10/10, SCHEDULED
-                #45 HIIT Express, 2026-11-20T12:00:00Z, Hall B, trainer #4, 0/12, CANCELLED
-                """;
+        var found = classes.findAll(from, to, trainerId, type, onlyAvailable, limit, offset);
+        StringBuilder body = new StringBuilder("total: ").append(found.size()).append('\n');
+        found.forEach(gymClass -> body.append('#').append(gymClass.id()).append(' ').append(gymClass.name())
+                .append(", ").append(gymClass.startTime()).append(", ").append(gymClass.room())
+                .append(", trainer #").append(gymClass.trainerId()).append(", ")
+                .append(gymClass.capacity() - gymClass.availableSeats()).append('/').append(gymClass.capacity())
+                .append(", ").append(gymClass.status()).append('\n'));
+        return body.toString();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public String create(@Valid @RequestBody GymClassCreate req) {
-        return "id: 100\nname: " + req.name() + "\nstartTime: " + req.startTime()
+        long id = classes.create(req.name(), req.type(), req.trainerId(), req.startTime(),
+                req.durationMin(), req.room(), req.capacity());
+        return "id: " + id + "\nname: " + req.name() + "\nstartTime: " + req.startTime()
                 + "\nroom: " + req.room() + "\ncapacity: " + req.capacity() + "\nstatus: SCHEDULED\n";
     }
 
     @GetMapping("/{classId}")
     public String get(@PathVariable int classId) {
-        if (classId < 42 || classId > 45) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found");
-        }
-        return """
-                id: 42
-                name: Morning Yoga
-                type: yoga
-                trainer: #3 Dana Serikova
-                startTime: 2026-11-20T07:00:00Z
-                durationMin: 60
-                room: Hall A
-                capacity: 15
-                bookedCount: 12
-                status: SCHEDULED
-                """;
+        var gymClass = classes.findById(classId).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found"));
+        return "id: " + gymClass.id() + "\nname: " + gymClass.name() + "\ntype: " + gymClass.type()
+                + "\ntrainer: #" + gymClass.trainerId() + "\nstartTime: " + gymClass.startTime()
+                + "\ndurationMin: " + gymClass.durationMin() + "\nroom: " + gymClass.room()
+                + "\ncapacity: " + gymClass.capacity() + "\nbookedCount: "
+                + (gymClass.capacity() - gymClass.availableSeats()) + "\nstatus: " + gymClass.status() + "\n";
     }
 
     @PatchMapping("/{classId}")
     public String update(@PathVariable int classId, @Valid @RequestBody GymClassUpdate req) {
+        var gymClass = classes.findById(classId).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found"));
+        var updated = new ClassRepository.GymClass(gymClass.id(),
+                req.name() == null ? gymClass.name() : req.name(),
+                gymClass.type(),
+                req.trainerId() == null ? gymClass.trainerId() : req.trainerId(),
+                req.startTime() == null ? gymClass.startTime() : req.startTime(),
+                req.durationMin() == null ? gymClass.durationMin() : req.durationMin(),
+                req.room() == null ? gymClass.room() : req.room(),
+                gymClass.capacity(),
+                gymClass.availableSeats(),
+                gymClass.status());
+        if (!classes.update(updated)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found");
+        }
         return "id: " + classId + "\nupdated\n";
     }
 
     @PostMapping("/{classId}/cancel")
     public String cancel(@PathVariable int classId, @Valid @RequestBody(required = false) CancelClassRequest req) {
+        if (!classes.cancel(classId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found");
+        }
         return "id: " + classId + "\nstatus: CANCELLED\n";
     }
 
     @GetMapping("/{classId}/bookings")
     public String bookings(@PathVariable int classId) {
-        return """
-                #501 client #17, BOOKED
-                #503 client #21, BOOKED
-                """;
+        if (classes.findById(classId).isEmpty()) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found");
+        }
+        return String.join("", bookings.listForClass(classId));
     }
 }

@@ -5,6 +5,7 @@ import kz.gymbooking.dto.LoginRequest;
 import kz.gymbooking.dto.RefreshRequest;
 import kz.gymbooking.dto.RegisterRequest;
 import kz.gymbooking.error.ApiException;
+import kz.gymbooking.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,21 +23,32 @@ public class AuthController {
             expiresIn: 900
             """;
 
+    private final UserRepository users;
+
+    public AuthController(UserRepository users) {
+        this.users = users;
+    }
+
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     public String register(@Valid @RequestBody RegisterRequest req) {
-        if (req.email().equals("taken@example.com")) {
+        if (users.findByEmail(req.email()).isPresent()) {
             throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "Email is already registered");
         }
-        return TOKENS + "user: #18 " + req.fullName() + ", " + req.email() + ", CLIENT\n";
+        UserRepository.UserRecord user = users.create(req.fullName(), req.email(), req.phone(),
+                req.password(), "CLIENT");
+        return TOKENS + "user: #" + user.id() + " " + user.fullName() + ", " + user.email() + ", CLIENT\n";
     }
 
     @PostMapping("/login")
     public String login(@Valid @RequestBody LoginRequest req) {
-        if (req.password().equals("wrong")) {
+        var user = users.findByEmail(req.email())
+                .filter(record -> record.passwordHash() != null && record.passwordHash().equals(req.password()))
+                .orElse(null);
+        if (user == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Wrong email or password");
         }
-        return TOKENS + "user: #17 Aruzhan Bekova, aruzhan@example.com, CLIENT\n";
+        return TOKENS + "user: #" + user.id() + " " + user.fullName() + ", " + user.email() + ", " + user.role() + "\n";
     }
 
     @PostMapping("/refresh")
