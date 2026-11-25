@@ -11,6 +11,7 @@ import kz.gymbooking.dto.GymClassUpdate;
 import kz.gymbooking.error.ApiException;
 import kz.gymbooking.repository.BookingRepository;
 import kz.gymbooking.repository.ClassRepository;
+import kz.gymbooking.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -28,10 +29,12 @@ public class ClassController {
 
     private final ClassRepository classes;
     private final BookingRepository bookings;
+    private final UserRepository users;
 
-    public ClassController(ClassRepository classes, BookingRepository bookings) {
+    public ClassController(ClassRepository classes, BookingRepository bookings, UserRepository users) {
         this.classes = classes;
         this.bookings = bookings;
+        this.users = users;
     }
 
     @GetMapping
@@ -55,6 +58,7 @@ public class ClassController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public String create(@Valid @RequestBody GymClassCreate req) {
+        requireTrainer(req.trainerId());
         long id = classes.create(req.name(), req.type(), req.trainerId(), req.startTime(),
                 req.durationMin(), req.room(), req.capacity());
         return "id: " + id + "\nname: " + req.name() + "\nstartTime: " + req.startTime()
@@ -76,10 +80,12 @@ public class ClassController {
     public String update(@PathVariable int classId, @Valid @RequestBody GymClassUpdate req) {
         var gymClass = classes.findById(classId).orElseThrow(() ->
                 new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found"));
+        long trainerId = req.trainerId() == null ? gymClass.trainerId() : req.trainerId();
+        requireTrainer(trainerId);
         var updated = new ClassRepository.GymClass(gymClass.id(),
                 req.name() == null ? gymClass.name() : req.name(),
                 gymClass.type(),
-                req.trainerId() == null ? gymClass.trainerId() : req.trainerId(),
+                trainerId,
                 req.startTime() == null ? gymClass.startTime() : req.startTime(),
                 req.durationMin() == null ? gymClass.durationMin() : req.durationMin(),
                 req.room() == null ? gymClass.room() : req.room(),
@@ -90,6 +96,13 @@ public class ClassController {
             throw new ApiException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Class not found");
         }
         return "id: " + classId + "\nupdated\n";
+    }
+
+    private void requireTrainer(long trainerId) {
+        if (!users.existsByIdAndRole(trainerId, "TRAINER")) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_STATE",
+                    "User does not have the TRAINER role");
+        }
     }
 
     @PostMapping("/{classId}/cancel")

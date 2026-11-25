@@ -10,6 +10,21 @@
 - `repository` — SQL-доступ к PostgreSQL
 - `src/main/resources/schema.sql` — SQL для создания таблиц
 
+## Модель пользователей
+
+- `users` — основная модель пользователя: `id`, `email`, `password_hash`, `role`, `created_at`, а также данные профиля `full_name` и `phone`.
+- Отдельная таблица профиля сейчас не нужна: в проекте пока нет дополнительных полей, которые требовали бы отделить профиль от учётной записи.
+- `memberships.user_id` и `bookings.user_id` ссылаются на `users.id`: один пользователь может иметь несколько абонементов и бронирований.
+- `classes.trainer_id` ссылается на `users.id`; для этого пользователя бизнес-правило требует роль `TRAINER`.
+- При удалении пользователя связанные с ним абонементы, бронирования и занятия удаляются внешними ключами с `ON DELETE CASCADE`.
+
+```mermaid
+erDiagram
+    users ||--o{ memberships : owns
+    users ||--o{ bookings : makes
+    users ||--o{ classes : teaches
+```
+
 
 адрес локального апи: http://localhost:8080/api/v1/
 
