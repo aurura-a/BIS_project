@@ -94,8 +94,7 @@ public class TrainingRepository {
                 WHERE users.email = 'demo-chart@gym.local'
                   AND workouts.started_at >= ?
                   AND workouts.started_at < ?
-                GROUP BY date_trunc(?, workouts.started_at AT TIME ZONE 'UTC'),
-                         muscle_groups.id, muscle_groups.name
+                GROUP BY 1, muscle_groups.id, muscle_groups.name
                 ORDER BY period_start, muscle_groups.name
                 """, (rs, rowNum) -> new TrainingChartPoint(
                 rs.getObject("period_start", java.time.LocalDate.class),
@@ -105,7 +104,7 @@ public class TrainingRepository {
                 rs.getLong("total_sets"),
                 rs.getLong("total_reps"),
                 rs.getBigDecimal("total_volume_kg")),
-                interval, from, to, interval);
+                interval, from, to);
     }
 
     private record ExerciseRow(

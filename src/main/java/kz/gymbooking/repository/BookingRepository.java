@@ -20,7 +20,9 @@ public class BookingRepository {
             rs.getLong("class_id"),
             rs.getString("status"),
             rs.getObject("booked_at", OffsetDateTime.class),
-            rs.getObject("cancelled_at", OffsetDateTime.class));
+            rs.getObject("cancelled_at", OffsetDateTime.class),
+            rs.getObject("checked_in_at", OffsetDateTime.class),
+            rs.getObject("qr_identifier", UUID.class));
 
     private final JdbcTemplate jdbc;
 
@@ -94,6 +96,6 @@ public class BookingRepository {
     }
 
     public record Booking(long id, long userId, long classId, String status, OffsetDateTime bookedAt,
-                          OffsetDateTime cancelledAt) {
+                          OffsetDateTime cancelledAt, OffsetDateTime checkedInAt, UUID qrIdentifier) {
     }
 }

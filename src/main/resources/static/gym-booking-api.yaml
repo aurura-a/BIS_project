@@ -1087,6 +1087,7 @@ components:
         bookedAt: { type: string, format: date-time }
         cancelledAt: { type: [string, 'null'], format: date-time }
         checkedInAt: { type: [string, 'null'], format: date-time }
+        qrIdentifier: { type: [string, 'null'], format: uuid }
 
     # ── memberships ──
     MembershipPlan:
