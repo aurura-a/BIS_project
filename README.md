@@ -1,46 +1,26 @@
 # Gym Booking Backend
 
-Бэкенд проекта. Стек: Spring Boot 4, Java 21, Maven, Angular.
+This is my gym booking backend. I use Java 21, Spring Boot, Maven, and PostgreSQL.
+The frontend is not part of my current work.
 
-Структура:
+## Project structure
 
-- `controller` — эндпоинты
-- `dto` — тела запросов из контракта с аннотациями валидации, enum'ы для query-параметров
-- `error` — ошибки и их вывод текстом
-- `repository` — SQL-доступ к PostgreSQL
-- `src/main/resources/schema.sql` — SQL для создания таблиц
+- `controller` contains the API endpoints.
+- `dto` contains request and response types.
+- `repository` contains database queries.
+- `src/main/resources/schema.sql` creates the database tables.
+- `src/main/resources/data.sql` adds the demo exercise and workout data.
+- `src/main/resources/static/gym-booking-api.yaml` describes the API.
 
-## Модель пользователей
+## Database
 
-- `users` — основная модель пользователя: `id`, `email`, `password_hash`, `role`, `created_at`, а также данные профиля `full_name` и `phone`.
-- Отдельная таблица профиля сейчас не нужна: в проекте пока нет дополнительных полей, которые требовали бы отделить профиль от учётной записи.
-- `memberships.user_id` и `bookings.user_id` ссылаются на `users.id`: один пользователь может иметь несколько абонементов и бронирований.
-- `classes.trainer_id` ссылается на `users.id`; для этого пользователя бизнес-правило требует роль `TRAINER`.
-- При удалении пользователя связанные с ним абонементы, бронирования и занятия удаляются внешними ключами с `ON DELETE CASCADE`.
-
-```mermaid
-erDiagram
-    users ||--o{ memberships : owns
-    users ||--o{ bookings : makes
-    users ||--o{ classes : teaches
-```
-
-
-адрес локального апи: http://localhost:8080/api/v1/
-
-контракт апи лежит в ресурсах проекта по адресу src/main/resources/static
-заготовка по фронтэнду пока не функционирует, но находится в процессе написания
-
-## PostgreSQL
-
-Создайте базу данных один раз:
+Create a PostgreSQL database:
 
 ```sql
 CREATE DATABASE gym_db;
 ```
 
-При запуске Spring Boot файл `schema.sql` автоматически создаст таблицы, если их
-ещё нет. Для подключения задайте параметры вашей локальной PostgreSQL:
+Set the connection details and start the application:
 
 ```sh
 export DB_URL=jdbc:postgresql://localhost:5432/gym_db
@@ -49,47 +29,49 @@ export DB_PASSWORD=
 mvn spring-boot:run
 ```
 
-Для другой установки PostgreSQL укажите имя пользователя и пароль, заданные при
-настройке сервера.
+Spring Boot runs `schema.sql` and `data.sql` when the application starts.
+The SQL uses conflict checks so the exercise catalog is not duplicated. The
+workout rows marked `Demo chart data` are rebuilt at each start with dates
+relative to the current day.
 
-## API
+The database has these training tables:
 
-Базовый адрес: `http://localhost:8080/api/v1`
+- `muscle_groups` stores muscle group names.
+- `exercises` stores exercise names and descriptions.
+- `exercise_muscle_groups` links exercises to muscle groups. An exercise can
+  use more than one group. Each link is marked as primary or secondary.
+- `workout_sessions` stores the user and start time for a workout.
+- `workout_exercises` stores the exercises, sets, reps, and weight in a workout.
 
-| Метод | Путь | Что делает | Успешный ответ |
-|---|---|---|---|
-| POST | /auth/register | Регистрация клиента | 201 |
-| POST | /auth/login | Вход по email и паролю | 200 |
-| POST | /auth/refresh | Новая пара токенов по refresh-токену | 200 |
-| POST | /auth/logout | Выход | 204 |
-| GET | /users/me | Мой профиль | 200 |
-| PATCH | /users/me | Изменить имя / телефон | 200 |
-| GET | /users | Список пользователей (role, q, limit, offset) | 200 |
-| PATCH | /users/{userId}/role | Сменить роль пользователя | 200 |
-| GET | /trainers | Список тренеров (specialization, limit, offset) | 200 |
-| POST | /trainers | Сделать пользователя тренером | 201 |
-| GET | /trainers/{trainerId} | Тренер по id | 200 |
-| PATCH | /trainers/{trainerId} | Изменить тренера | 200 |
-| GET | /classes | Расписание (from, to, trainerId, type, onlyAvailable, limit, offset) | 200 |
-| POST | /classes | Создать занятие | 201 |
-| GET | /classes/{classId} | Занятие по id | 200 |
-| PATCH | /classes/{classId} | Изменить занятие | 200 |
-| POST | /classes/{classId}/cancel | Отменить занятие | 200 |
-| GET | /classes/{classId}/bookings | Записи на занятие | 200 |
-| POST | /bookings | Записаться на занятие | 201 |
-| GET | /users/me/bookings | Мои записи (status, upcoming, limit, offset) | 200 |
-| GET | /bookings/{bookingId} | Запись по id | 200 |
-| POST | /bookings/{bookingId}/cancel | Отменить запись | 200 |
-| GET | /membership-plans | Тарифы абонементов | 200 |
-| POST | /memberships | Купить абонемент | 201 |
-| GET | /users/me/memberships | Мои абонементы | 200 |
-| POST | /access/qr-token | QR-токен для входа (живёт 60 сек) | 200 |
-| POST | /access/check-in | Проверка QR на входе (GRANTED / DENIED) | 200 |
-| GET | /access/visits | Журнал посещений (userId, from, to, limit, offset) | 200 |
-| GET | /device-providers | Поддерживаемые устройства | 200 |
-| GET | /users/me/devices | Мои устройства | 200 |
-| POST | /users/me/devices | Подключить устройство | 201 |
-| DELETE | /users/me/devices/{deviceId} | Отключить устройство | 204 |
-| POST | /users/me/devices/{deviceId}/sync | Синхронизировать устройство | 200 |
-| GET | /users/me/metrics | Мои метрики (type, from, to, bookingId) | 200 |
-## Frontend
+Exercise responses list the linked muscle groups and mark each one as primary or
+secondary.
+
+The demo data belongs to `demo-chart@gym.local`. This is a sample account for
+the chart endpoint and does not have a password. Do not use it as a real user
+account.
+
+## Training API
+
+The API base address is `http://localhost:8080/api/v1`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/muscle-groups` | List muscle groups |
+| GET | `/exercises` | List exercises |
+| GET | `/exercises?muscleGroupId=1` | List exercises for a muscle group |
+| GET | `/demo/training-chart` | Get daily chart data for the last 28 days |
+| GET | `/demo/training-chart?from=2026-11-01&to=2026-11-27&interval=WEEK` | Get weekly chart data for a date range |
+
+Chart results include the period, muscle group, workout count, sets, reps, and
+training volume in kilograms. An exercise can be linked to both primary and
+secondary muscle groups, so its values can appear under more than one group.
+Do not add the group totals together to calculate the total for a workout.
+
+The fitness device endpoints and `/users/me/metrics` are still stubs. They are
+separate from the exercise and workout data used by the training chart.
+
+## Other API areas
+
+The backend also has endpoints for authentication, users, trainers, classes,
+bookings, memberships, and gym access. The full API contract is in
+`src/main/resources/static/gym-booking-api.yaml`.

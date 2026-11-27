@@ -33,6 +33,8 @@ tags:
     description: QR entry to the gym
   - name: Devices
     description: Fitness gadgets (stub provider)
+  - name: Training
+    description: Exercise catalog and demo chart data
 
 paths:
   # ───────────────────────── Auth ─────────────────────────
@@ -690,6 +692,71 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Metric' }
 
+  /muscle-groups:
+    get:
+      operationId: listMuscleGroups
+      tags: [Training]
+      summary: List muscle groups
+      security: []
+      responses:
+        '200':
+          description: Muscle groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MuscleGroup' }
+
+  /exercises:
+    get:
+      operationId: listExercises
+      tags: [Training]
+      summary: List exercises
+      security: []
+      parameters:
+        - in: query
+          name: muscleGroupId
+          schema: { type: integer, format: int64, minimum: 1 }
+          description: Return exercises linked to this muscle group
+      responses:
+        '200':
+          description: Exercises with their muscle groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Exercise' }
+
+  /demo/training-chart:
+    get:
+      operationId: getDemoTrainingChart
+      tags: [Training]
+      summary: Get demo workout chart data
+      description: Returns workout totals for a seeded demo user. The default range is the last 28 days.
+      security: []
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: interval
+          schema:
+            type: string
+            enum: [DAY, WEEK]
+            default: DAY
+      responses:
+        '200':
+          description: Chart points grouped by date and muscle group
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TrainingChartPoint' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1115,3 +1182,44 @@ components:
         value: { type: number, example: 132 }
         unit: { type: string, example: bpm }
         recordedAt: { type: string, format: date-time }
+
+    MuscleGroup:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string, example: Chest }
+        description: { type: [string, 'null'], example: Pectoral muscles }
+
+    Exercise:
+      type: object
+      required: [id, name, muscleGroups]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string, example: Bench Press }
+        description: { type: [string, 'null'], example: Barbell chest press }
+        muscleGroups:
+          type: array
+          items: { $ref: '#/components/schemas/ExerciseMuscleGroup' }
+
+    ExerciseMuscleGroup:
+      type: object
+      required: [id, name, role]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string, example: Chest }
+        role:
+          type: string
+          enum: [PRIMARY, SECONDARY]
+
+    TrainingChartPoint:
+      type: object
+      required: [periodStart, muscleGroupId, muscleGroup, workoutCount, totalSets, totalReps, totalVolumeKg]
+      properties:
+        periodStart: { type: string, format: date }
+        muscleGroupId: { type: integer, format: int64 }
+        muscleGroup: { type: string, example: Chest }
+        workoutCount: { type: integer, format: int64, example: 2 }
+        totalSets: { type: integer, format: int64, example: 8 }
+        totalReps: { type: integer, format: int64, example: 64 }
+        totalVolumeKg: { type: number, format: double, example: 16800.00 }
