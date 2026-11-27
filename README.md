@@ -46,6 +46,28 @@ The database has these training tables:
 Exercise responses list the linked muscle groups and mark each one as primary or
 secondary.
 
+The `classes` table also stores scheduled time slots. It keeps the start time,
+duration, capacity, available seats, and status. A full slot is identified by
+having no available seats.
+
+The `bookings` table links a user to a class. A booking has a status, booking
+time, cancellation time, and check-in time. The status can be `BOOKED`,
+`CANCELLED`, `ATTENDED`, or `NO_SHOW`. The optional `qr_identifier` is a unique
+UUID field reserved for identifying a booking in a QR flow.
+
+The QR identifier is only part of the booking data model. Issuing and checking
+QR tokens are not implemented here. Those API endpoints are still stubs.
+
+## Booking and QR API
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/bookings` | Book a scheduled class |
+| GET | `/bookings/{bookingId}` | Get booking status and times |
+| POST | `/bookings/{bookingId}/cancel` | Cancel a booking |
+| POST | `/access/qr-token` | QR token stub |
+| POST | `/access/check-in` | QR check-in stub |
+
 The demo data belongs to `demo-chart@gym.local`. This is a sample account for
 the chart endpoint and does not have a password. Do not use it as a real user
 account.
